@@ -1,3 +1,29 @@
+Day 1: Infrastructure & Connectivity (Jan 12, 2026)
 
+1. Objective
+
+Establish the foundational "Command Center" for the Agentic MLOps system, ensuring secure LLM connectivity and production-grade observability.
+
+2. Technical Setup
+
+Runtime: Python 3.12 within an isolated venv to prevent dependency drift.
+
+Terminal: Shifted from PowerShell to Git Bash for a POSIX-compliant engineering environment.
+
+Framework: Integrated pydantic-ai for structured agent orchestration.
+
+Observability: Authenticated and linked Logfire for real-time trace logging of agent reasoning.
+
+3. Infrastructure Decisions
+
+Model Selection: Attempted gemini-2.5-pro, but encountered Error 429 (Rate Limit). Decided to use gemini-1.5-flash for the Phase 1 prototype due to higher throughput on the free tier.
+
+Security: Implemented .env file for API key management, ensuring credentials are never exposed in source code.
+
+4. Results
+
+Heartbeat Test: Successfully executed verify_agent.py.
+
+Logfire Trace: Confirmed that agent "thoughts" are being captured at logfire-eu.pydantic.dev.
 
 
