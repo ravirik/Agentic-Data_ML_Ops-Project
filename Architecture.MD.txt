@@ -18,3 +18,8 @@ The system uses a **Decoupled Agentic Pattern**. The logic (LLM) is separated fr
 3. **Reasoning Loop** -> LLM decides if a tool call is required.
 4. **Tool Execution** -> Python functions interact with the File System.
 5. **Observability** -> Logfire captures the entire trace for audit.
+
+Ingestion Layer: Added Pandas-based metadata extractor for raw CSV files.
+Agent Core (O2): Implemented the Iterative Cognitive Loop (Reason -> Act -> Observe -> Reflect) using Gemini 1.5 Flash.
+Execution Layer: Integrated Pydantic AI Tools for safe schema inspection.
+
