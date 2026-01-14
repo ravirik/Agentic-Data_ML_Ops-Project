@@ -1,0 +1,22 @@
+{
+	"recipes" : [
+	{
+		"issue" : "Precision fragility",
+		"keyword" : "float64",
+		"solution" : "df[col] = df[col].round(2)",
+		"explanation" : "Casts float64 to two decimal places to prevent financial rounding errors."
+	},
+	{
+		"issue" : "Data inconsistency",
+		"keyword" : "date",
+		"solution" : "df[col] = pd.to_datetime(df[col], errors='coerce')",
+		"explanation" : "Standardizes various string date formats into datetime objects."
+	},
+	{
+		"issue" : "Boolean Misrepresenation",
+		"keyword" : "discount",
+		"solution" : "df[col] =df[col].map({'True': True, 'False' : False, 'nan' : None})",
+		"explanation" : "Converts string flags and nulls into native Boolean types."
+	}
+		]
+}

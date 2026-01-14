@@ -2,6 +2,7 @@ import logfire
 from pydantic_ai import Agent
 import pandas as pd
 import os
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,39 +12,40 @@ logfire.instrument_pydantic_ai()
 
 data_agent = Agent('google-gla:gemini-flash-latest', 
 						system_prompt=(
-							"You are a Agentic Data Engineer. Your goal is to inspect raw data"
-							"and 'Fragility' in the pipeline."
-							"Follow the ReAct pattern: Reason about the data, suggest an Action,"
-							"and explain what you expect to observe."
+							"You are a Agentic Data and ML Engineer . "
+                                                        "1. Use 'inspect dataset' to see raw data issues. "
+                                                        "2. Use search_knowledge_store to find verified fixes in memory. " 
+                                                        "3. Follow the ReAct pattern: Reason, Act, Observe."
 						),
 )
 
-def get_data_summary():
-	"""Tool to read the first few rows and schema of the dataset."""
-	file_path='data/retail_store_sales.csv'
-	if not os.path.exists(file_path):
-		return "Error: File not found"
-	df=pd.read_csv(file_path, nrows=10)
-	summary= {
-		"colums":list(df.columns),
-		"sample_data": df.head(5).to_dict(),
-		"missing_values":df.isnull().sum().to_dict(),
-		"data_types":list(df.dtypes)
-	}
-	return str(summary)
 
 @data_agent.tool
-
 def inspect_datset(ctx) -> str:
-	""" Provides the datset with actual schema and sample of dirty data."""
-	return get_data_summary()
+	"""Read the raw CSV schema and sample date."""
+	df=pd.read_csv('data/retail_store_sales.csv', nrows=10)
+	return str({
+		"columns" : list(df.columns),
+		"missing_values" : df.isnull().sum().to_dict(),
+		"types" : [str(t) for t in df.dtypes]
+	})
+
+@data_agent.tool
+def search_knowledge_store(ctx, search_term: str) -> str:
+	"""Fetch verified tranformation recipes from memory _store.json'"""
+	with open('memory_store.json','r') as f:
+		data = json.load(f)
+		# Find recipes where the keyword or issue matches the search term
+		matches = [r for r in data['recipes'] if search_term.lower() in r['keyword'].lower()]
+		return str(matches) if matches else "No matching recipe found."
+
 
 async def run_reasoning_cycle():
-	#The "thought" trigger
-	user_prompt = "Inspect the retail dataset and find 3 issues that could break a SQL pipeline or create further hindrance in creating data pipelines"
-	result = await data_agent.run(user_prompt)
+	#This prompt tests both 01 ( Memory ) and 02 ( Reasoning )
+	prompt = "Find a column with a precision issue and suggest a fix from memory."
+	result = await data_agent.run(prompt)
 
-	print("\n--- AGENT REASONING (02) ---")
+	print("\n--- AGENT OUTPUT ---")
 	print(result.output)
 
 if __name__ == "__main__":
