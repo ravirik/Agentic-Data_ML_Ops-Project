@@ -7,7 +7,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-logfire.configure()
+logfire.configure(
+	send_to_logfire=os.getenv('LOGFIRE_ENABLED', 'true').lower()=='true'
+)
 logfire.instrument_pydantic_ai()
 
 data_agent = Agent('google-gla:gemini-flash-latest', 
@@ -21,7 +23,7 @@ data_agent = Agent('google-gla:gemini-flash-latest',
 
 
 @data_agent.tool
-def inspect_datset(ctx) -> str:
+def inspect_dataset(ctx) -> str:
 	"""Read the raw CSV schema and sample date."""
 	df=pd.read_csv('data/retail_store_sales.csv', nrows=10)
 	return str({
