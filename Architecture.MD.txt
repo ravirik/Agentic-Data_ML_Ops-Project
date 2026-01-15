@@ -2,7 +2,8 @@
 
 ## 1. High-Level Design
 
-The system uses a **Decoupled Agentic Pattern**. The logic (LLM) is separated from the execution (Tools) to ensure that the AI cannot perform unauthorized actions on the data.
+The system uses a **Decoupled Agentic Pattern**. The logic (LLM) is separated from the execution (Tools) to ensure that the 
+AI cannot perform unauthorized actions on the data.
 
 ## 2. Technology Stack
 
@@ -19,7 +20,46 @@ The system uses a **Decoupled Agentic Pattern**. The logic (LLM) is separated fr
 4. **Tool Execution** -> Python functions interact with the File System.
 5. **Observability** -> Logfire captures the entire trace for audit.
 
+--------------------------
+
 Ingestion Layer: Added Pandas-based metadata extractor for raw CSV files.
 Agent Core (O2): Implemented the Iterative Cognitive Loop (Reason -> Act -> Observe -> Reflect) using Gemini 1.5 Flash.
 Execution Layer: Integrated Pydantic AI Tools for safe schema inspection.
 
+------------------
+
+Reasoning Engine :- The Updated Logic Flow:
+
+Input: User provides "Dirty" CSV.
+
+Perception: inspect_dataset identifies schema fragility (e.g., float64 precision).
+
+Memory Retrieval: Agent queries memory_store.json for the verified fix.
+
+Refinement: Agent compares internal LLM logic with the retrieved JSON recipe.
+
+Output: A deterministic recommendation for the Execution Layer.
+
+
+-----------------------
+
+The Architectural Specification 
+
+Component	           Technical Definition	                Role in Pipeline
+Agent Class	           pydantic_ai.Agent	        Orchestrates the ReAct (Reason-Act-Observe) loop.
+Model Engine	       gemini-flash-latest	        The "Reasoning Kernel" providing the cognitive logic.
+O1 (Memory)	           memory_store.json	        The retrieval-augmented knowledge base for deterministic fixes.
+O2 (Reasoning)	       search_knowledge_store	    The bridging tool that prevents model hallucinations.
+O3 (Observability)	   Logfire	                    The telemetry layer capturing the "Thought Chain."
+
+
+Model Provider Layer: Transitioned from raw string IDs to GoogleModel via the pydantic_ai.models.google module to handle the 2026 v1beta API pathing.
+
+Knowledge Retrieval (O1): Implementation of a Keyword-to-Recipe Mapper. The retrieval logic now uses Case-Insensitive Substring Matching to 
+bridge the gap between LLM reasoning and JSON keys.
+
+Reasoning Loop (O2): Explicit ReAct (Reason-Act-Observe) pattern. The agent is strictly prompted to Search before Suggesting, ensuring 
+it acts as a "Grounded Engineer" rather than a "Generative Assistant."
+
+Safety Constraints: Integration of UsageLimits (request_limit=5). This acts as the "Architectural Circuit Breaker" to prevent infinite loops and 
+API quota exhaustion.

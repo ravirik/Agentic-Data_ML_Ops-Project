@@ -1,10 +1,10 @@
 {
 	"recipes" : [
 	{
-		"issue" : "Precision fragility",
+		"issue" : "Precision fix",
 		"keyword" : "float64",
 		"solution" : "df[col] = df[col].round(2)",
-		"explanation" : "Casts float64 to two decimal places to prevent financial rounding errors."
+		"explanation" : "Casts float64 columns to 2 decimal places to prevent financial rounding errors."
 	},
 	{
 		"issue" : "Data inconsistency",
