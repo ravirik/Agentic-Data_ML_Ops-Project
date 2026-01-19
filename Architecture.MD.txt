@@ -63,3 +63,23 @@ it acts as a "Grounded Engineer" rather than a "Generative Assistant."
 
 Safety Constraints: Integration of UsageLimits (request_limit=5). This acts as the "Architectural Circuit Breaker" to prevent infinite loops and 
 API quota exhaustion.
+
+----------------------------------------------------------------
+
+Section 4.6: Semantic vs. Syntactic Retrieval)
+
+Section 4.6: The Keyword Bottleneck Observations from Trace bffbff07512c4d439f2d86daf0551671 indicate that LLMs prioritize 
+Semantic Intent (e.g., "round to two decimal places") over the specific Syntactic Keywords (e.g., "float64") stored in O1. 
+To mitigate this, the search_knowledge_store tool was refined to perform substring matching across multiple metadata fields, 
+though the primary challenge remains aligning LLM vocabulary with established data engineering schemas.
+
+Section 4.7: Search Protocol Optimization To bridge the semantic gap between LLM reasoning and syntactic JSON retrieval, 
+a Strict Search Protocol was implemented in the agent's core instructions. This ensures that tool arguments are derived from the inspect_dataset 
+metadata rather than generative descriptions.
+
+The Final Architecture: "The O1-O2-O3 Integration
+
+Stage                Logic Component                                 Empirical Proof (from Trace)
+Input                 O1(Memory),                       "FOUND THE FOLLOWING RECIPES: Precision fix"
+Process               O2 (Reasoning)                    Mapping the round(2) solution to the Total Spent column.
+Action                O3 (Execution)                    "SUCCESS: Transformation applied... File saved."
