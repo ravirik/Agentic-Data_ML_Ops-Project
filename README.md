@@ -1,26 +1,44 @@
-Project Status: v1.0 - Heuristic Baseline (Jan 20, 2026)
+# Agentic Data — MLOps Project 🚀
 
+[![Project Status](https://img.shields.io/badge/status-v1.0%20%E2%80%94%20Heuristic%20Baseline-blue)](#)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12-brightgreen)](https://www.python.org/)
+[![Observability](https://img.shields.io/badge/observability-Logfire-lightgrey)](#)
 
-Core Achievements
+A focused Agentic MLOps prototype demonstrating a grounded ReAct-style agent for deterministic data cleaning and remediation. The system couples a type-safe agent framework (pydantic-ai) with a JSON-based knowledge store to avoid hallucinations, an execution layer that applies verified Python transformations, and observability through Logfire.
 
-Autonomous Remediation: Implemented a closed-loop Agentic Engine that identifies data quality issues and applies verified Python transformations without human intervention.
+✨ Built for auditability, deterministic fixes, and rapid prototyping of agentic data engineering flows.
 
-Grounded Reasoning: Successfully integrated Research Objective O1 (Memory) and O2 (Reasoning) by grounding the agent in a JSON-based Knowledge Store, eliminating LLM hallucinations.
+---
 
-Self-Healing Logic: Proven capability to handle "Dirty Data" (e.g., NaN values) by autonomously reflecting on tool execution errors and resubmitting patched code.
+Table of contents
+- Overview
+- Quick architecture (visual)
+- Key components
+- Repository layout
+- Quickstart (run locally)
+- Memory (knowledge) store & recipe format
+- Example flow (step-by-step)
+- Observability & safety
+- Testing & debugging
+- Extending the project
+- Contributing
+- License & contact
 
+---
 
-Technical Stack (v1.0)
+## Overview
 
-Framework: pydantic-ai for ReAct-based agentic orchestration.
+This project demonstrates an agentic approach to data engineering:
 
-Observability: End-to-end tracing via Logfire for auditability and "Glass Box" transparency.
+- O1 — Memory: JSON knowledge store (memory_store.json) of verified transformation recipes.
+- O2 — Reasoning: pydantic-ai Agent wired to a Gemini model performing inspect → search → act.
+- O3 — Execution & Observability: Decorated tools that apply transformations and Logfire traces for audit.
 
-Data Layer: Pandas-based execution environment with isolated local_scope for security.
+Goal: deterministic, auditable fixes for common "dirty data" problems (nulls, types, precision, date formats), not free-form generation.
 
+---
 
-Validation Metrics
+## Quick architecture (visual) 🏗️
 
-Success Rate: 100% on verified precision and type-casting recipes.
-
-Operational Latency: Reduced transformation time from manual script writing (minutes/hours) to autonomous execution (<10 seconds).
+ASCII flow (simple):
