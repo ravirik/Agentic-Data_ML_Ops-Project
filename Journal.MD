@@ -103,3 +103,25 @@ Successfully executed the first end-to-end grounded data cleaning cycle without 
 
 https://logfire-eu.pydantic.dev/public-trace/274aa129-c602-449b-ae40-82698c4eaad5?spanId=e1b91633c89489d5
 
+---------------------------------------------------------------------------------
+
+
+Entry: 2026-01-23
+
+The "Semantic" Milestone
+
+Migrated from a keyword-based JSON search to a ChromaDB Semantic Search.
+
+Updated the apply_transformation tool to use a dynamic local_scope. The agent now synthesizes full scripts rather than relying on hardcoded column names.
+
+The system successfully cleaned the Price Per Unit, Total Spent, and Quantity columns in a single 4-turn reasoning cycle.
+
+Successfully optimized the agent to operate within the 5 RPM limit by batching inspection and retrieval.
+
+Infrastructure Stabilization
+
+Resolved Git merge conflicts and path errors arising from the transition to a local D: drive environment.
+
+Testing Created test_tools.py to verify O1 and O3 components without consuming API quota.
+
+https://logfire-eu.pydantic.dev/public-trace/6514c83c-6c3d-4181-bd02-56a5d7021954?spanId=0731ae5721835910

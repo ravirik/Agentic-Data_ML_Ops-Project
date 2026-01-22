@@ -83,3 +83,27 @@ Stage                Logic Component                                 Empirical P
 Input                 O1(Memory),                       "FOUND THE FOLLOWING RECIPES: Precision fix"
 Process               O2 (Reasoning)                    Mapping the round(2) solution to the Total Spent column.
 Action                O3 (Execution)                    "SUCCESS: Transformation applied... File saved."
+
+
+-------------------------------------------
+
+# Project Architecture: Agentic RAG for ML Lifecycle
+
+## Overview
+This system implements an Agentic Retrieval-Augmented Generation (RAG) framework to automate data engineering tasks. It follows a modular O1-O2-O3 design pattern.
+
+### Layer 1: O1 - Knowledge Retrieval (Memory)
+* **Vector Store**: Uses **ChromaDB** as a persistent vector database stored locally.
+* **Semantic Search**: Implements intent-based retrieval to handle case-insensitivity and synonyms (e.g., mapping "FIX DECIMALS" to "Precision Fix").
+* **Source of Truth**: A curated `memory_store.json` containing verified data engineering recipes.
+
+### Layer 2: O2 - Reasoning Engine (Brain)
+* **LLM**: `gemini-1.5-flash-latest`.
+* **Framework**: **Pydantic AI** for strict type-safe agent definitions.
+* **ReAct Loop**: A Reasoning + Acting cycle that performs multi-step discovery (Inspect -> Search -> Apply).
+
+### Layer 3: O3 - Observability & Safety (Execution)
+* **Guardrails**: **UsageLimits** enforce a 5-request ceiling per cycle to prevent infinite loops and manage API costs.
+* **Observability**: Integrated with **Pydantic Logfire** for real-time trace monitoring.
+* **Executioner**: A local-scope `exec()` environment that applies generated Python code directly to the CSV dataset.
+
