@@ -1,6 +1,7 @@
 import logfire
+import chromadb
 from pydantic_ai.models.google import GoogleModel
-from pydantic_ai import Agent, UsageLimits
+from pydantic_ai import Agent, RunContext, UsageLimits
 import pandas as pd
 import os
 import json
@@ -14,25 +15,23 @@ logfire.configure(
 )
 logfire.instrument_pydantic_ai()
 
+client = chromadb.PersistentClient(path="./chroma_db")
+collection = client.get_or_create_collection(name="transformation_recipes")
+
 # Initialize the global model without explicitly mentioning the specific model
 model = GoogleModel('gemini-flash-latest')
 
-# Updated Agent focusing on strict ReAct behavior and Grounding
+# Reasoning Engine ( Agent Configuration )
 data_agent = Agent(
 	model=model,
 	system_prompt=(
-	"""You are an Agentic Data Engineer. Your goal is to clean data using verified recipes.\n"
-	### OPERATIONAL PROTOCOL:
-	1. INSPECT: Use 'inspect_dataset' to identify data types and issues.
-	2. SEARCH STRATEGY: 
-   	- When searching the knowledge store, DO NOT use full sentences.
-   	- Use strict technical keywords found during inspection (e.g., 'float64', 'int64', 'null', 'Precision').
-   	- If a search for a natural term (like 'round') fails, retry ONCE using the data type (like 'float64').
-	3. EXECUTION:
-   	- Once a recipe is found, call 'apply_transformation' IMMEDIATELY.
-   	- If the first execution fails with an error, analyze the error and try to patch the code (e.g., adding .fillna(0)) ONCE.
-	4. TERMINATION: Do not exceed 5 tool calls. If the fix isn't applied by then, report the failure.
-	"""
+        "You are an Agentic Data Engineer. Goal: Clean data using Semantic RAG.\n"
+        "### OPERATIONAL PROTOCOL (Strict 5 RPM Limit):\n"
+        "1. BATCH INSPECT: Use 'inspect_dataset' to identify ALL column issues at once.\n"
+        "2. SEMANTIC SEARCH: Use 'search_knowledge_base' to find similar solutions. "
+        "   The retrieved code is a HINT; adapt it to the actual column names in the CSV.\n"
+        "3. ONE-SHOT EXECUTION: Write one Python script to fix all identified issues in one call.\n"
+        "4. TERMINATION: Complete the task in 3 tool calls or less to stay under quota."
     ),
 )
 
@@ -45,16 +44,19 @@ def inspect_dataset(ctx) -> str:
         return str({
             "columns": list(df.columns),
             "types": {col: str(t) for col, t in zip(df.columns, df.dtypes)},
-            "sample_data": df.head(2).to_dict()
+            "sample_data": df.head(3).to_dict()
         })
     except Exception as e:
-        return f"Error reading file: {e}"
+        return f"File error: {e}"
 
-@data_agent.tool
-def search_knowledge_store(ctx, search_term: str) -> str:
+
+""" DEACTIVATED OLD JSON SEARCH """
+
+''' @data_agent.tool
+def search_knowledge_store(ctx, search_term : str) -> str:
     """Fetch verified transformation recipes from memory_store.json."""
     try:
-        with open('memory_store.json', 'r') as f:
+       with open('memory_store.json', 'r') as f:
             data = json.load(f)
         
         search_term_clean = search_term.lower()
@@ -67,55 +69,79 @@ def search_knowledge_store(ctx, search_term: str) -> str:
             explanation_val = r.get('explanation', '').lower()
             
             if (search_term_clean in issue_val or 
-                search_term_clean in keyword_val or 
+               search_term_clean in keyword_val or 
                 search_term_clean in explanation_val):
-                matches.append(r)
+               matches.append(r)
 
         if matches:
             # Format the output clearly so the LLM doesn't miss the 'solution' key
-            formatted_results = "\n".join([
+           formatted_results = "\n".join([
                 f"RECIPE: {m['issue']}\nCODE: {m['solution']}\nEXPLANATION: {m['explanation']}" 
-                for m in matches
+               for m in matches
             ])
             return f"FOUND THE FOLLOWING RECIPES:\n{formatted_results}"
         
         return f"No matching recipe found for '{search_term}'."
     except Exception as e:
-        return f"Knowledge store error: {e}"
+        return f"Knowledge store error: {e}" '''
+
+
+""" ACTIVE NEW SEMANTIC SEARCH """
+@data_agent.tool
+async def search_knowledge_base(ctx: RunContext[str], query: str) -> str:
+    """
+    Search the vector database for data engineering solutions.
+    Use this to find recipes for issues like precision, nulls or formatting.
+    """
+    try:
+        # Fetch top 3 results to save RPM by giving the LLM more context at once
+        results = collection.query(query_texts=[query], n_results = 3)
+
+        if not results['documents'][0]:
+            return "No specific recipes found. Rely on your internal python knowledge."
+        
+        context = "Retrieved recipes from Memory:\n"
+        for i, (doc, meta) in enumerate (zip(results['documents'][0], results['metadatas'][0])):
+            context += f"{i+1}. Issue : {doc}\n Solution Hint:{meta['solution']} "
+        return context
+
+    except Exception as e:
+        return f"Vector DB Error: {e}"
 
 @data_agent.tool
-def apply_transformation(ctx, column_name: str, python_code: str) -> str:
-	""" 03 Executioner: Applies the verified recipe to the CSV and saves the cleaned version """
+def apply_transformation(ctx, python_code: str) -> str:
+	"""  Executioner: Applies the synthesized code to the CSV and saves the cleaned version """
 	try:
 		#Load the raw data
 		file_path = 'data/retail_store_sales.csv'
 		df = pd.read_csv(file_path)
 	
-		# Prepare the execution environment
-		# We pass 'df' and 'column_name' into the local scope for the exec() call
-		local_scope = {'df' : df, 'col' : column_name}
+		# Prepare the execution environment: pass 'df' for the exec() call
+		local_scope = {'df': df}
 
-		# Execute the grounded code (e.g., df[col] =df[col].round(2)
+		# Execute the grounded code (e.g., df['Unit_Price'] = df['Unit_Price'].round(2))
 		exec(python_code, {}, local_scope)
 
 		# Retrieve the updated dataframe
 		df_cleaned = local_scope['df']
 
-		# Save the result 
+		# Save the result
 		output_path = 'data/retail_store_sales_cleaned.csv'
-		df_cleaned.to_csv(output_path, index = False)
-		
-		return f"SUCCESS: Transformation applied to '{column_name}'. File saved at {output_path}."
+		df_cleaned.to_csv(output_path, index=False)
+
+		return f"SUCCESS: Transformation applied. File saved at {output_path}."
 	except Exception as e:
 		return f"EXECUTION ERROR: {str(e)}"
 
+
+# --- EXECUTION LOOP ---
+
 async def run_reasoning_cycle():
-    # UsageLimits protect API quota from infinite loops (O3)
+    # UsageLimits protect API quota from infinite loops (Guardrails)
     limits = UsageLimits(request_limit=5, tool_calls_limit=5)
 
     try:
-        # Narrow prompt to prevent the Agent from getting distracted
-        prompt = "Identify ONE column with precision issues, find its recipe in memory, and explain the fix."
+        prompt = "Inspect the dataset, find all columns needing decimal rounding, search for solutions, and apply the fix."
         
         result = await data_agent.run(prompt, usage_limits=limits)
 
