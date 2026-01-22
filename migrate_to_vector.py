@@ -37,11 +37,3 @@ for i, recipe in enumerate(recipes_list):
 
 print(f"Successfully migrated {len(recipes_list)} recipes to ChromaDB!")
 
-# Quick Test: Searching for 'precision'
-results = collection.query(
-    query_texts=["How to fix decimals?"],
-    n_results=1
-)
-print("\n--- TEST SEARCH RESULT ---")
-print(f"Found Issue: {results['metadatas'][0][0]['issue']}")
-print(f"Suggested Code: {results['metadatas'][0][0]['solution']}")
