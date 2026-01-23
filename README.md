@@ -1,241 +1,185 @@
-# Agentic Data — MLOps Project 🚀
+```markdown
+# Agentic-Data — Retrieval-Augmented (RAG) MLOps Agent
 
-[![Project Status](https://img.shields.io/badge/status-v1.0%20%E2%80%94%20Heuristic%20Baseline-blue)](#)
+Updated: 2026-01-23
+
+[![Project Status](https://img.shields.io/badge/status-v1.0%20%E2%80%94%20RAG%20Prototype-blue)](#)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-brightgreen)](https://www.python.org/)
 [![Observability](https://img.shields.io/badge/observability-Logfire-lightgrey)](#)
 
-A focused Agentic MLOps prototype demonstrating a grounded ReAct-style agent for deterministic data cleaning and remediation. The system couples a type-safe agent framework (pydantic-ai) with a JSON-based knowledge store to avoid hallucinations, an execution layer that applies verified Python transformations, and observability through Logfire.
+Overview
+--------
+This repository implements an Agentic Retrieval-Augmented Generation (RAG) system for deterministic, auditable data engineering workflows. The agent combines:
 
-✨ Built for auditability, deterministic fixes, and rapid prototyping of agentic data engineering flows.
+- O1 — Memory: persistent vector-backed knowledge (ChromaDB) + curated recipe JSON (`memory_store.json`).
+- O2 — Reasoning: type-safe agent wiring using `pydantic-ai` and a Gemini model; the agent performs semantic retrieval + ReAct-style reasoning.
+- O3 — Execution & Observability: verified transformation execution and Logfire traces for auditability.
 
----
+Key goals:
+- Use semantic retrieval to ground actions in verified recipes and reduce LLM hallucination.
+- Keep execution deterministic and auditable (trace every tool call).
+- Protect API quota and execution with usage limits and safety notes.
 
-Table of contents
-- [Overview](#overview)
-- [Quick architecture (visual)](#quick-architecture-visual)
-- [Key components](#key-components)
-- [Repository layout](#repository-layout)
-- [Quickstart (run locally)](#quickstart--run-locally)
-- [Memory (knowledge) store & recipe format](#memory-knowledge-store--recipe-format)
-- [Example flow (step-by-step)](#example-flow-step-by-step)
-- [Observability & safety](#observability--safety)
-- [Testing & debugging](#testing--debugging)
-- [Extending the project](#extending-the-project)
-- [Contributing](#contributing)
-- [License & contact](#license--contact)
+What changed (RAG-focused)
+--------------------------
+- Vector store (ChromaDB) is used as the primary retrieval layer. Recipes from `memory_store.json` are vectorized and stored in `chroma_db`.
+- `search_knowledge_store` performs semantic lookup in the Chroma collection (intent-based retrieval).
+- The agent prompt and wiring explicitly demand "Semantic RAG" operations (inspect → retrieve relevant recipe vectors → adapt & apply verified transformation).
+- Code files reflect the RAG stack: `reasoning.py` configures ChromaDB, vector collection, and uses a GoogleModel (Gemini) while the system prompt instructs the agent to operate under a strict RAG protocol.
 
----
+Repository layout (high-level)
+------------------------------
+- reasoning.py — Core: RAG wiring, ChromaDB client, agent tools (inspect_dataset, semantic search wrapper, apply_transformation), and run loop.
+- agent_reasoning.py — Example async run demonstrating an agent reasoning cycle.
+- verify_agent.py — Connectivity + Logfire verification.
+- test_tools.py — Local pre-flight tests for tools.
+- memory_store.json — Curated recipes (source of truth) used to produce embeddings.
+- chroma_db/ — local persistent Chroma database (created at runtime).
+- data/ — Example dataset(s) (e.g., data/retail_store_sales.csv).
+- Journal.MD / Architecture.MD — experimental notes and architecture rationale.
+- LICENSE, .env (not checked in).
 
-<a name="overview"></a>
-## Overview
+Primary components & flow
+-------------------------
+1. inspect_dataset() — reads CSV schema and sample rows to produce a compact summary the agent can use to form retrieval queries.
+2. semantic retrieval — transform query/prompt into an embedding, search the Chroma collection for nearest recipe vectors, retrieve top-k candidate recipes (including metadata: explanation, code snippet, tags).
+3. agent reasoning (RAG loop) — agent performs ReAct steps using retrieved context; it adapts recipe snippets to the dataset and decides whether to call apply_transformation.
+4. apply_transformation(python_code) — executes verified Python code against an in-repo pandas DataFrame and writes a cleaned artifact (e.g., data/retail_store_sales_cleaned.csv).
+5. Observability — Logfire captures agent "thoughts", tool calls, and outcomes for audit.
 
-This project demonstrates an agentic approach to data engineering:
+Visual flow, icons & graphs
+---------------------------
+Below are the flowchart, icons legend, and an ASCII architecture visual that reflect the current README visuals and match the repo's RAG orientation.
 
-- O1 — Memory: JSON knowledge store (memory_store.json) of verified transformation recipes.
-- O2 — Reasoning: pydantic-ai Agent wired to a Gemini model performing inspect → search → act.
-- O3 — Execution & Observability: Decorated tools that apply transformations and Logfire traces for audit.
+Icon legend
+- 🧠 Agent reasoning (O2)
+- 📚 O1 Memory (recipes / vector store)
+- 🧪 Execution sandbox (apply + save)
+- 🔍 Observability (Logfire traces)
+- ⚙️ Infra / orchestration (ChromaDB, embeddings)
+- 🔒 Safety & policies
 
-Goal: deterministic, auditable fixes for common "dirty data" problems (nulls, types, precision, date formats), not free-form generation.
-
-<a name="quick-architecture-visual"></a>
-## Quick architecture (visual) 🏗️
-
-ASCII flow (simple):
-
+ASCII flowchart (high-level)
 ```
 User / CLI
    │
    ▼
-Agent (pydantic-ai)  <-- System Prompt enforces strict ReAct + search protocol
+🧠 Agent (pydantic-ai + Gemini)  <-- System Prompt enforces "Semantic RAG" protocol
    │
    ├─> inspect_dataset()  — reads data/retail_store_sales.csv (schema & sample)
    │
-   ├─> search_knowledge_store(search_term)  — queries memory_store.json
+   ├─> embed(query) -> ⚙️ ChromaDB / transformation_recipes (semantic retrieval)
+   │       └─> returns top-k recipes (metadata + code snippet)
    │
-   └─> apply_transformation(column_name, python_code) — executes code, saves cleaned CSV
+   └─> adapt_recipe() -> decide -> apply_transformation(python_code)
+            │
+            └─> 🧪 exec() (local scope with df) -> writes data/retail_store_sales_cleaned.csv
    │
    ▼
-Artifacts: data/retail_store_sales_cleaned.csv  + Logfire traces
+🔍 Logfire traces + stdout (audit trail)
 ```
 
-Icon legend:
-- 🧠 Agent reasoning
-- 📚 O1 Memory (recipes)
-- 🧪 Execution sandbox (apply + save)
-- 🔍 Observability (Logfire traces)
-
-<a name="key-components"></a>
-## Key components 🔎
-
-- `reasoning.py` — Core tools & agent wiring (`inspect_dataset`, `search_knowledge_store`, `apply_transformation`).
-- `agent_reasoning.py` — Example async flow that runs a reasoning cycle and prints agent outputs.
-- `verify_agent.py` — Quick connectivity + Logfire verification script.
-- `test_tools.py` — Pre-flight tests exercising the tools without running the full agent.
-- `memory_store.json` — Curated JSON knowledge store (recipes).
-- `data/retail_store_sales.csv` — Example dataset referenced by the scripts (add locally).
-- `Journal.MD` / `Architecture.MD.txt` — Design notes, experiments, and architecture rationale.
-
-<a name="repository-layout"></a>
-## Repository layout (high-level) 📁
-- reasoning.py  
-- agent_reasoning.py  
-- verify_agent.py  
-- test_tools.py  
-- memory_store.json  
-- data/  
-  - retail_store_sales.csv (example input)  
-- Journal.MD  
-- Architecture.MD.txt  
-- LICENSE  
-- .env (not checked in; create locally)
-
-<a name="quickstart--run-locally"></a>
-## Quickstart — run locally ⚙️
-
-Prereqs:
-- Python 3.12
-- git
-- API keys / environment variables for your model provider if using external LLMs
-- Recommended: virtual env (venv/conda)
-
-1) Clone and create a venv
-```bash
-git clone https://github.com/ravirik/Agentic-Data_ML_Ops-Project.git
-cd Agentic-Data_ML_Ops-Project
-python -m venv .venv
-source .venv/bin/activate
+Architecture ASCII (detailed)
+```
++----------------------+      +----------------------+      +---------------------+
+|     User / CLI       | ---> |     Agent (O2)       | ---> |  Execution (O3)     |
+|  (prompt / requests) |      | pydantic-ai + LLM    |      | apply_transformation|
++----------------------+      +----------------------+      +---------------------+
+                                     |
+                                     |  semantic retrieval (embeddings)
+                                     v
+                             +----------------------+
+                             |     ChromaDB (O1)    |
+                             |  transformation_recipes
+                             +----------------------+
+                                     |
+                                     v
+                             +----------------------+
+                             |   memory_store.json  |
+                             |  (curated recipes)   |
+                             +----------------------+
 ```
 
-2) Install dependencies
-```bash
-pip install -r requirements.txt
-# If requirements.txt is missing:
-# pip install pydantic-ai logfire pandas python-dotenv
+Graph / metrics placeholders
+- Embedding/indexing: recipe_count = N, vector_dim = D (computed at indexing time)
+- Retrieval: top_k = 3 (configurable)
+- UsageLimits: request_limit = 5, tool_calls_limit = 5
+
+Quickstart — run locally (RAG)
+------------------------------
+1. Clone:
+   ```bash
+   git clone https://github.com/ravirik/Agentic-Data_ML_Ops-Project.git
+   cd Agentic-Data_ML_Ops-Project
+   ```
+
+2. Create venv & install:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+3. Add credentials to `.env` (examples):
+   ```
+   LOGFIRE_ENABLED=true
+   GOOGLE_API_KEY=...
+   ```
+
+4. Ensure example data exists:
+   - Add `data/retail_store_sales.csv` or update `reasoning.py`/`agent_reasoning.py` to point to your dataset.
+
+5. Initialize / index `memory_store.json` into ChromaDB (if not already):
+   - The Chroma persistent client is configured at `./chroma_db`.
+   - Run your indexing script to embed recipes and upsert into `transformation_recipes`.
+
+6. Verify connectivity:
+   ```bash
+   python verify_agent.py
+   ```
+
+7. Run the example RAG reasoning cycle:
+   ```bash
+   python agent_reasoning.py
+   ```
+
+Security & safety (important)
+-----------------------------
+- apply_transformation currently executes Python snippets using exec() with a local scope containing `df`. This is unsafe for arbitrary, untrusted code.
+- Recommended hardening steps:
+  - Validate/whitelist AST nodes (no imports, no OS/network access).
+  - Execute transformations in a sandboxed subprocess or container.
+  - Sign/verify recipes before executing (tether to a trusted source of truth).
+  - Keep `.env` and keys out of source control.
+
+Observability & quotas
+----------------------
+- Logfire is instrumented to capture agent traces and tool calls.
+- UsageLimits are enforced in the agent run loop to avoid runaway LLM usage (e.g., 5 RPM / limited tool calls).
+- Journal.MD contains run traces and decisions (including rate limit notes).
+
+Extending the project
+---------------------
+- Add robust indexing scripts to keep `transformation_recipes` synced with `memory_store.json`.
+- Expand unit tests: each recipe should have a small golden-case test that runs locally (no LLM calls).
+- Harden execution: AST validation, sandboxing, or policy enforcement before running code.
+- Add CI: a GitHub Actions workflow that runs local golden tests and lints (no external LLM calls).
+- Add visual diagrams (SVG/PNG) to `/docs/` and reference them from README for richer renderers.
+
+Contributing
+------------
+1. Open an issue describing the change.
+2. Branch from `main` and create a PR.
+3. Add tests and documentation for any behavior changes.
+
+License & contact
+-----------------
+Apache-2.0 — see `LICENSE`
+
+Maintainer: @ravirik
+
+Notes
+-----
+- This README preview adds the missing visual flow, icons, and architecture ASCII diagrams present in the current README.MD. No repo changes were made. Tell me when you want me to commit this version (and which branch).
 ```
-
-3) Create a `.env` at repo root
-```
-LOGFIRE_ENABLED=true
-# Add provider-specific keys as needed, e.g.:
-# GOOGLE_API_KEY=your_api_key_here
-```
-
-4) Verify connectivity & instrumentation
-```bash
-python verify_agent.py
-```
-Expect a printed agent response or an error that will help you debug API or env issues.
-
-5) Run the reasoning cycle (example)
-```bash
-python agent_reasoning.py
-```
-What happens:
-- The agent inspects `data/retail_store_sales.csv`
-- Searches `memory_store.json` for matching recipes
-- Attempts to apply a verified transformation using `apply_transformation`
-- Outputs reasoning traces to stdout and sends spans to Logfire (if enabled)
-
-6) Run pre-flight tool tests
-```bash
-python test_tools.py
-```
-
-<a name="memory-knowledge-store--recipe-format"></a>
-## Memory (knowledge) store & recipe format 📚
-
-The deterministic knowledge base is `memory_store.json`. It contains an array of recipe objects the agent searches via substring matching.
-
-Example structure:
-```json
-{
-  "recipes": [
-    {
-      "issue": "Precision loss in Total Spent column",
-      "keyword": "float64",
-      "explanation": "Round monetary values to 2 decimals to avoid precision drift in SQL aggregates.",
-      "solution": "df['Total Spent'] = df['Total Spent'].round(2)"
-    },
-    {
-      "issue": "Null values in Quantity column",
-      "keyword": "null",
-      "explanation": "Fill missing quantities with 0 for downstream numeric ops.",
-      "solution": "df['Quantity'] = df['Quantity'].fillna(0).astype(int)"
-    }
-  ]
-}
-```
-
-Best practices:
-- Keep `solution` snippets small and well-tested.
-- Use technical `keyword` values (data types, error phrases, column names).
-- Add `explanation` and `issue` for human-readable traceability.
-
-<a name="example-flow-step-by-step"></a>
-## Example flow (step-by-step) 🔁
-
-1. Agent calls `inspect_dataset()` → returns columns, types, sample rows, missing counts.  
-2. Agent extracts technical keywords (e.g., `float64`, `null`, column name).  
-3. Agent calls `search_knowledge_store(keyword)` → receives matched recipes (substring match).  
-4. Agent selects a recipe and calls `apply_transformation(column, solution)`.  
-5. `apply_transformation` executes Python code in a constrained local scope and writes `data/retail_store_sales_cleaned.csv`.  
-6. Logfire records the agent's "thoughts" and tool calls for audit.
-
-Edge behavior:
-- If execution fails, the agent may attempt a single patch (prompt-specified behavior).
-- UsageLimits in the agent prompt prevent runaway API usage (max tool calls).
-
-<a name="observability--safety"></a>
-## Observability & safety 🔒📈
-
-- Logfire is instrumented in `reasoning.py`. Toggle with `LOGFIRE_ENABLED` in `.env`.  
-- Tools are decoupled from the agent — agent suggests code strings; `apply_transformation` executes them in a local scope and reports errors.  
-- UsageLimits and prompt-level constraints limit tool calls and retries.  
-- Production hardening recommendations: sandbox execution, AST validation, whitelisting, or running transformations under a job agent.
-
-<a name="testing--debugging"></a>
-## Testing & debugging 🧪
-
-- Read `Journal.MD` and `Architecture.MD.txt` for experimental traces and rationale.  
-- Common issues:
-  - Missing `data/retail_store_sales.csv` → add or change filepath in `reasoning.py`/`agent_reasoning.py`
-  - Rate limits (HTTP 429) → lower request frequency or upgrade provider quota
-  - `memory_store.json` typos → ensure valid JSON (missing commas can break the search)
-- Reproducibility: record git commit hash and `.env` values used when running experiments.
-
-<a name="extending-the-project"></a>
-## Extending the project ✨
-
-Ideas:
-- Add more recipes and test cases to `memory_store.json`.  
-- Harden `apply_transformation` with AST parsing / sandbox execution.  
-- Add a small CI workflow (GitHub Actions) that runs a tiny golden-end-to-end test.  
-- Integrate experiment logging (run manifests with commit hash + env snapshot).  
-- Add an inference server for safely serving cleaned data or transformations.
-
-<a name="contributing"></a>
-## Contributing 🤝
-
-Contributions are welcome!
-
-1. Open an issue describing the change.  
-2. Branch from `main`: `git checkout -b feature/your-change`  
-3. Add tests and documentation for behavior changes.  
-4. Open a pull request linking to relevant Journal entries where appropriate.
-
-Suggested labels: enhancement, bug, docs, tests, infra.
-
-<a name="license--contact"></a>
-## License & contact 📬
-
-This project is available under the Apache-2.0 license — see `LICENSE`.
-
-Maintainer: ravirik
-
-If you'd like, I can:
-- Add a GitHub Actions workflow for a tiny "golden run" test,  
-- Build a secure sandbox wrapper for recipe execution,  
-- Prepare a sample `memory_store.json` with verified recipes and a small test dataset.
-
-Thank you — happy agentic engineering! 🧭
