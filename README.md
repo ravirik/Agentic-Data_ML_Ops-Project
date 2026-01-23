@@ -190,7 +190,3 @@ Architecture ASCII (detailed)
 Apache-2.0 — see `LICENSE`
 
 Maintainer: @ravirik
-
-📝 Notes
------
-- This README preview adds the missing visual flow, icons, and architecture ASCII diagrams present in the current README, adds a clickable Table of Contents, and converts the header badges to plain images. No repo changes were made here. Tell me when you want me to commit this version and I will prepare a branch and PR (default branch name: fix/readme-toc-badges) or push directly.
