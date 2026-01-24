@@ -125,3 +125,39 @@ Resolved Git merge conflicts and path errors arising from the transition to a lo
 Testing Created test_tools.py to verify O1 and O3 components without consuming API quota.
 
 https://logfire-eu.pydantic.dev/public-trace/6514c83c-6c3d-4181-bd02-56a5d7021954?spanId=0731ae5721835910
+
+---------------------------------------------------------------------------------------------
+
+Entry: 2026-01-25
+
+Phase 1: Statistical Infrastructure 
+Baseline Generation: Implemented baseline_stats.json to store the "statistical fingerprint" (Mean and Std Dev) of the original clean dataset. This serves as the system's "Ground Truth."
+
+The Monitor Layer: Developed the check_data_drift tool. Used the Z-score methodology to mathematically measure how far incoming data has deviated from the established baseline.
+
+Phase 2: Knowledge Base Expansion 
+O1 Layer Upgrade: Added advanced remediation recipes to memory_store.json, specifically Winsorization (Outlier Capping) and Z-Score Filtering.
+
+Vector Sync: Successfully re-ingested the updated JSON into ChromaDB on the D: drive, enabling the agent to retrieve "Statistical Guardrail" code hints during the RAG process.
+
+Phase 3: Observability & Visibility 
+Data Profiling: Enhanced the inspection tools to include Representative Data Sampling (df.head()). This provided the LLM with direct observability of raw values, moving it beyond metadata-only reasoning.
+
+Prompt Engineering: Refined the System Prompt to enforce a "Mandatory Gateway"—forcing the agent to check for drift before searching for cleaning recipes.
+
+Phase 4: Final Validation & The "Z-487" Success
+Scenario: Tested the pipeline against a corrupted dataset with extreme price inflation.
+
+Execution Trace:
+
+Detection: Agent flagged a catastrophic Z-score of 487.78 in Price Per Unit.
+
+Reasoning: System autonomously pivoted from standard rounding to Drift Mitigation.
+
+Remediation: Successfully retrieved and applied the Winsorization recipe, capping values at the 5th and 95th percentiles.
+
+Final Polish: Applied precision rounding and boolean type-casting in a unified execution turn.
+
+Metrics: Total cycle completed in < 10 seconds across 4 tool calls, staying within the 5 RPM quota.
+
+https://logfire-eu.pydantic.dev/public-trace/6c0ae4d6-1030-4e53-851d-f5341c444db0?spanId=fde262966055b4d4

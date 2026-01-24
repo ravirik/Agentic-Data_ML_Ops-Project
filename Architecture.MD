@@ -107,3 +107,11 @@ This system implements an Agentic Retrieval-Augmented Generation (RAG) framework
 * **Observability**: Integrated with **Pydantic Logfire** for real-time trace monitoring.
 * **Executioner**: A local-scope `exec()` environment that applies generated Python code directly to the CSV dataset.
 
+## **4. O4 - The Statistical Monitor (Drift Detection)**
+* **Methodology**: Implements frequentist statistical analysis via **Z-Score Calculation** comparing real-time batches against a saved `baseline_stats.json`.
+* **Thresholding**: A hard-coded threshold of **Z > 3** triggers the "High-Severity Drift" state.
+* **The RAG Pivot**: Upon drift detection, the Agent bypasses standard cleaning recipes in favor of **Winsorization (Capping)** to maintain the structural integrity of the ML features.
+
+## **5. Observability & Logging**
+* **Logfire Integration**: All agentic reasoning turns (Thought -> Action -> Observation) are traced in real-time.
+* **Quota Management**: Logic is optimized for a **5 RPM ceiling**, achieving complex remediation (Drift + Precision + Typing) in a single unified execution turn.
