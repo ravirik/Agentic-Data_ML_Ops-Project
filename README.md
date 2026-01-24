@@ -1,191 +1,232 @@
 # Agentic-Data-MLOps — Retrieval-Augmented Generation (RAG) Agent
 
-![Project Status](https://img.shields.io/badge/status-v1.0%20%E2%80%94%20RAG%20Prototype-blue)
+![Project Status](https://img.shields.io/badge/status-v1.3%20%E2%80%94%20RAG%20Prototype-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.12-brightgreen)
 ![Observability](https://img.shields.io/badge/observability-Logfire-lightgrey)
 
-<!-- Table of Contents -->
-## Table of Contents
+Table of Contents
 - [Overview](#overview)
-- [What changed (RAG-focused)](#what-changed-rag-focused)
-- [Repository layout (high-level)](#repository-layout-high-level)
-- [Primary components & flow](#primary-components--flow)
-- [Visual flow, icons & graphs](#visual-flow-icons--graphs)
-- [Quickstart — run locally (RAG)](#quickstart--run-locally-rag)
+- [What's new (v1.3)](#whats-new-v13)
+- [High-level flow & diagrams](#high-level-flow--diagrams)
+  - [Mermaid flowchart](#mermaid-flowchart)
+  - [ASCII architecture](#ascii-architecture)
+- [New Feature: Statistical Guardrails](#new-feature-statistical-guardrails)
+- [The 5-Layer Architecture](#the-5-layer-architecture)
+- [Primary components & runtime flow](#primary-components--runtime-flow)
+- [Repository layout & related repositories](#repository-layout--related-repositories)
+- [Quickstart — run locally (RAG + Guardrails)](#quickstart--run-locally-rag--guardrails)
 - [Security & safety (important)](#security--safety-important)
 - [Observability & quotas](#observability--quotas)
 - [Extending the project](#extending-the-project)
 - [Contributing](#contributing)
 - [License & contact](#license--contact)
-- [Notes](#notes)
 
-🧭 Overview
+Overview
 --------
-This repository implements an Agentic Retrieval-Augmented Generation (RAG) system for deterministic, auditable data engineering workflows. The agent combines:
+Agentic-Data-MLOps implements a Retrieval-Augmented Generation (RAG) agent designed for deterministic, auditable data transformations. The agent grounds its reasoning in a curated recipe knowledge base (O1), uses a type-safe orchestration layer (O2) and a verified execution sandbox (O3), while providing automated monitoring (O4) and full observability (O5).
 
-- O1 — Memory: persistent vector-backed knowledge (ChromaDB) + curated recipe JSON (`memory_store.json`).
-- O2 — Reasoning: type-safe agent wiring using `pydantic-ai` and a Gemini model; the agent performs semantic retrieval + ReAct-style reasoning.
-- O3 — Execution & Observability: verified transformation execution and Logfire traces for auditability.
 
-Key goals:
-- Use semantic retrieval to ground actions in verified recipes and reduce LLM hallucination.
-- Keep execution deterministic and auditable (trace every tool call).
-- Protect API quota and execution with usage limits and safety notes.
+What's new ( RAG with Drift detection)
+-------------------------------------
+- Formalized "Statistical Gateway" protocol and explicit guardrail behaviors.
+- Added a concise "Extending the project" note for adding recipes and CI/CD next steps.
+- Minor clarifications to quickstart and verification steps.
 
-🆕 What changed (RAG-focused)
+High-level flow & diagrams
 --------------------------
-- Vector store (ChromaDB) is used as the primary retrieval layer. Recipes from `memory_store.json` are vectorized and stored in `chroma_db`.
-- `search_knowledge_store` performs semantic lookup in the Chroma collection (intent-based retrieval).
-- The agent prompt and wiring explicitly demand "Semantic RAG" operations (inspect → retrieve relevant recipe vectors → adapt & apply verified transformation). The system prompt instructs the agent to operate under a strict RAG protocol that requires semantic retrieval and evidence before producing actionable transformations.
-- Code files reflect the RAG stack: `reasoning.py` configures ChromaDB, the vector collection, and uses a GoogleModel (Gemini). Retrieved recipe metadata includes explanations and code snippets used to adapt transformations.
 
-📁 Repository layout (high-level)
-------------------------------
-- reasoning.py — Core: RAG wiring, ChromaDB client, agent tools (inspect_dataset, semantic search wrapper, apply_transformation), and run loop.
-- agent_reasoning.py — Example async run demonstrating an agent reasoning cycle.
-- verify_agent.py — Connectivity + Logfire verification.
-- test_tools.py — Local pre-flight tests for tools.
-- memory_store.json — Curated recipes (source of truth) used to produce embeddings.
-- chroma_db/ — local persistent Chroma database (created at runtime).
-- data/ — Example dataset(s) (e.g., data/retail_store_sales.csv).
-- Journal.MD / Architecture.MD — experimental notes and architecture rationale.
-- LICENSE, .env (not checked in).
-
-⚙️ Primary components & flow
--------------------------
-1. inspect_dataset() — reads CSV schema and sample rows to produce a compact summary the agent can use to form retrieval queries.
-2. semantic retrieval — transform query/prompt into an embedding, search the Chroma collection for nearest recipe vectors, retrieve top-k candidate recipes (including metadata: explanation, code snippets).
-3. agent reasoning (RAG loop) — agent performs ReAct steps using retrieved context; it adapts recipe snippets to the dataset and decides whether to call apply_transformation.
-4. apply_transformation(python_code) — executes verified Python code against an in-repo pandas DataFrame and writes a cleaned artifact (e.g., data/retail_store_sales_cleaned.csv).
-5. Observability — Logfire captures agent "thoughts", tool calls, and outcomes for audit.
-
-🖼️ Visual flow, icons & graphs
----------------------------
-Below are the flowchart, icons legend, and an ASCII architecture visual that reflect the current README visuals and match the repo's RAG orientation.
-
-Icon legend
-- 🧠 Agent reasoning (O2)
-- 📚 O1 Memory (recipes / vector store)
-- 🧪 Execution sandbox (apply + save)
-- 🔍 Observability (Logfire traces)
-- ⚙️ Infra / orchestration (ChromaDB, embeddings)
-- 🔒 Safety & policies
-
-ASCII flowchart (high-level)
+Mermaid flowchart (rendered on GitHub)
+```mermaid
+flowchart TD
+  U[User / CLI] --> A[Agent Orchestrator (pydantic-ai + Gemini)]
+  A --> I[inspect_dataset() -> df.head(), schema summary]
+  A --> D[check_data_drift() -> compare to baseline_stats.json]
+  D -->|Z <= 3| R[semantic retrieval (ChromaDB)]
+  D -->|Z > 3| W[retrieve Winsorization recipes]
+  R --> T[adapt_recipe & verify (AST checks, small tests)]
+  W --> T
+  T --> VFY[verify & sign check]
+  VFY --> EX[apply_transformation() -> sandboxed exec]
+  EX --> FS[Filesystem: data/*.csv]
+  A --> L[Logfire traces (Pydantic Logfire)]
+  L -->|audit| AuditStore[Audit Store / Journal.MD]
 ```
-User / CLI
+
+ASCII architecture (compact)
+```
+User/CLI
    │
    ▼
-🧠 Agent (pydantic-ai + Gemini)  <-- System Prompt enforces "Semantic RAG" protocol
-   │
-   ├─> inspect_dataset()  — reads data/retail_store_sales.csv (schema & sample)
-   │
-   ├─> embed(query) -> ⚙️ ChromaDB / transformation_recipes (semantic retrieval)
-   │       └─> returns top-k recipes (metadata + code snippet)
-   │
-   └─> adapt_recipe() -> decide -> apply_transformation(python_code)
-            │
-            └─> 🧪 exec() (local scope with df) -> writes data/retail_store_sales_cleaned.csv
++----------------------------------+
+|  Agent Orchestrator (O2)         |
+|  - pydantic-ai wiring            |
+|  - Gemini (gemini-flash-latest)  |
+|  - System prompt enforces gateway|
++----------------------------------+
+   │         │           │
+   │         │           ▼
+   │         │     +-------------+
+   │         │     |  ChromaDB   |
+   │         │     | transformation_recipes (O1) |
+   │         │     +-------------+
+   │         ▼
++----------------------+     +----------------------+
+|  Statistical Monitor |<----| baseline_stats.json  |
+|  (Z-score checks O4) |     | (generated by data_baseline.py) |
++----------------------+     +----------------------+
    │
    ▼
-🔍 Logfire traces + stdout (audit trail)
++-----------------------------+
+|  Execution (O3)             |
+|  - apply_transformation()   |
+|  - sandboxed subprocess     |
++-----------------------------+
+   │
+   ▼
+Pydantic Logfire traces & Journal.MD (O5)
 ```
 
-Architecture ASCII (detailed)
-```
-+----------------------+      +----------------------+      +---------------------+
-|     User / CLI       | ---> |     Agent (O2)       | ---> |  Execution (O3)     |
-|  (prompt / requests) |      | pydantic-ai + LLM    |      | apply_transformation|
-+----------------------+      +----------------------+      +---------------------+
-                                     |
-                                     |  semantic retrieval (embeddings)
-                                     v
-                             +----------------------+
-                             |     ChromaDB (O1)    |
-                             |  transformation_recipes
-                             +----------------------+
-                                     |
-                                     v
-                             +----------------------+
-                             |   memory_store.json  |
-                             |  (curated recipes)   |
-                             +----------------------+
-```
+New Feature: Statistical Guardrails
+----------------------------------
+The agent operates under a "Statistical Gateway" protocol to prevent silent data failures. Implementation details and behaviors are summarized below:
 
-📈 Graph / metrics placeholders
-- Embedding/indexing: recipe_count = N, vector_dim = D (computed at indexing time)
-- Retrieval: top_k = 3 (configurable)
-- UsageLimits: request_limit = 5, tool_calls_limit = 5
+- Drift Discovery:
+  - Before any transformation, the agent runs check_data_drift() to calculate Z-scores comparing live data to baseline_stats.json.
+  - Calculation uses the observed mean and baseline mean/std with standard error scaling (z = |current_mean - baseline_mean| / (baseline_std / sqrt(n))).
+  - Thresholding: Z > 3 is treated as "High-Severity Drift" and triggers remediation.
 
-⚡ Quickstart — run locally (RAG)
-------------------------------
+- Automated Remediation:
+  - If extreme drift (Z > 3) is detected, the agent autonomously retrieves Winsorization (Outlier Capping) recipes from the knowledge base (ChromaDB-backed memory_store.json).
+  - The agent adapts the retrieved Winsorization recipe (e.g., capping at the 5th/95th percentiles) and includes remediation in the synthesized one-shot transformation.
+  - Journal.MD contains examples and traces showing successful remediation (e.g., capping applied and subsequent successful run).
+
+- Grounded Reasoning:
+  - Discovery tools (inspect_dataset) provide raw data samples (df.head()) and a compact schema summary so agent decisions are grounded in actual record values rather than purely metadata.
+  - The system prompt enforces the "Mandatory Gateway" sequence: inspect_dataset() and check_data_drift() must be used before retrieval or transformations.
+
+The 5-Layer Architecture
+------------------------
+The project formalizes responsibilities into five layers demonstrated across the repository:
+
+- O1 — Memory:
+  - Persistent, vector-backed knowledge using ChromaDB and recipes in memory_store.json.
+
+- O2 — Reasoning:
+  - Type-safe agent orchestration using pydantic-ai and Gemini (gemini-flash-latest) executing a ReAct-style loop under an enforced operational protocol.
+
+- O3 — Execution:
+  - Verified transformation sandbox. The prototype uses apply_transformation() to exec() adapted code against pandas DataFrames and persist artifacts.
+
+- O4 — Monitoring:
+  - Automated statistical drift detection via check_data_drift() comparing to baseline_stats.json. Triggers remediation workflows (Winsorization) when needed.
+
+- O5 — Observability:
+  - Full-stack tracing and audits using Pydantic Logfire and human-readable run journals (Journal.MD).
+
+Primary components & runtime flow
+--------------------------------
+1. inspect_dataset(path) — sample rows (df.head()) and return a concise schema/sample summary.
+2. check_data_drift() — computes Z-scores for baseline comparison; emits drift report.
+3. retrieval — embed observation and query ChromaDB for top-k recipe vectors.
+4. adapt & verify — agent adapts retrieved recipes to the dataset, runs verification checks and unit tests.
+5. apply_transformation(python_code) — executes in a controlled environment and writes cleaned artifacts.
+6. observability — Logfire captures each reasoning turn and execution trace; Journal.MD persists human-readable outcomes.
+
+Repository layout & related repositories
+---------------------------------------
+Core files discovered:
+- reasoning.py — agent wiring, tools: inspect_dataset, check_data_drift, apply_transformation, model init, Logfire integration.
+- data_baseline.py — baseline_stats.json generator.
+- memory_store.json — canonical recipes.
+- chroma_db/ — persistent ChromaDB data directory.
+- Journal.MD / Architecture.MD — experiments, traces, and drift writeups.
+- test_tools.py — local pre-flight checks.
+- data_corruption_script.py — test scenario to inject drift.
+
+Recommended repo split for scaling (optional):
+- ravirik/agentic-core
+- ravirik/agentic-recipes
+- ravirik/agentic-indexer
+- ravirik/agentic-exec
+- ravirik/agentic-observability
+
+Quickstart — run locally (RAG + Guardrails)
+------------------------------------------
 1. Clone:
    ```bash
    git clone https://github.com/ravirik/Agentic-Data_ML_Ops-Project.git
    cd Agentic-Data_ML_Ops-Project
    ```
 
-2. Create venv & install:
+2. Create virtualenv & install:
    ```bash
    python -m venv .venv
    source .venv/bin/activate
    pip install -r requirements.txt
    ```
 
-3. Add credentials to `.env` (examples):
+3. Add credentials to `.env`:
    ```
    LOGFIRE_ENABLED=true
    GOOGLE_API_KEY=...
+   CHROMA_PERSIST_DIR=./chroma_db
    ```
 
-4. Ensure example data exists:
-   - Add `data/retail_store_sales.csv` or update `reasoning.py`/`agent_reasoning.py` to point to your dataset.
+4. Prepare baseline (one-time):
+   ```bash
+   python data_baseline.py
+   ```
+   - Produces `baseline_stats.json`.
 
-5. Initialize / index `memory_store.json` into ChromaDB (if not already):
-   - The Chroma persistent client is configured at `./chroma_db`.
-   - Run your indexing script to embed recipes and upsert into `transformation_recipes`.
+5. (Optional) Inject test drift:
+   ```bash
+   python data_corruption_script.py
+   ```
 
-6. Verify connectivity:
+6. Index recipes (one-time):
+   ```bash
+   python scripts/index_recipes.py --input memory_store.json --chroma-dir ./chroma_db
+   ```
+
+7. Verify & pre-flight:
    ```bash
    python verify_agent.py
+   python test_tools.py
    ```
 
-7. Run the example RAG reasoning cycle:
+8. Run example RAG cycle:
    ```bash
    python agent_reasoning.py
    ```
 
-🔒 Security & safety (important)
+Security & safety (important)
 -----------------------------
-- apply_transformation currently executes Python snippets using exec() with a local scope containing `df`. This is unsafe for arbitrary, untrusted code.
-- Recommended hardening steps:
-  - Validate/whitelist AST nodes (no imports, no OS/network access).
-  - Execute transformations in a sandboxed subprocess or container.
-  - Sign/verify recipes before executing (tether to a trusted source of truth).
-  - Keep `.env` and keys out of source control.
+- Prototype uses exec() in apply_transformation() — unsafe for untrusted code.
+- Hardening recommendations:
+  - AST whitelisting and node-level validation.
+  - Run transformations in sandboxed subprocesses/containers with resource caps and no network.
+  - Verify recipe signatures and require signed/approved recipes for execution.
+  - Add golden-case unit tests per recipe and run them pre-execution.
 
-👁️‍🗨️ Observability & quotas
+Observability & quotas
 ----------------------
-- Logfire is instrumented to capture agent traces and tool calls.
-- UsageLimits are enforced in the agent run loop to avoid runaway LLM usage (e.g., 5 RPM / limited tool calls).
-- Journal.MD contains run traces and decisions (including rate limit notes).
+- Pydantic Logfire integration captures agent reasoning and execution. Journal.MD and public Logfire traces provide reproducibility and audit trails.
+- UsageLimits: agent enforces a strict 5 RPM ceiling and is designed to complete the Inspect → Drift → Search → Apply cycle in minimal tool calls (goal: ≤4 calls).
 
-➕ Extending the project
+Extending the project
 ---------------------
-- Add robust indexing scripts to keep `transformation_recipes` synced with `memory_store.json`.
-- Expand unit tests: each recipe should have a small golden-case test that runs locally (no LLM calls).
-- Harden execution: AST validation, sandboxing, or policy enforcement before running code.
-- Add CI: a GitHub Actions workflow that runs local golden tests and lints (no external LLM calls).
-- Add visual diagrams (SVG/PNG) to `/docs/` and reference them from README for richer renderers.
+- New Recipes: Append new recipes to memory_store.json and re-run the indexing/migration script (e.g., scripts/index_recipes.py) to upsert vectors into ChromaDB.
+- CI/CD: Future work includes adding GitHub Actions for automated golden-case testing (validate recipes, run index validation, and run sanitized recipe tests without LLM calls).
+- Additional extensions: scaffold hardened execution runner, expand recipe metadata and signatures, or add human-in-the-loop approvals for high-severity drift actions.
 
-🤝 Contributing
+Contributing
 ------------
 1. Open an issue describing the change.
-2. Branch from `main` and create a PR.
-3. Add tests and documentation for any behavior changes.
+2. Branch from `main`, implement, and create a PR.
+3. Include tests and documentation for any behavior changes.
 
-📜 License & contact
+License & contact
 -----------------
 Apache-2.0 — see `LICENSE`
 
