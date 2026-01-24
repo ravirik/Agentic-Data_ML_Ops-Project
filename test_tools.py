@@ -24,7 +24,7 @@ async def pre_flight_check():
     # 3. Test NEW search_knowledge_base Tool (Semantic Search)
     try:
         # Testing with a case-insensitive, semantic query
-        result = await search_knowledge_base(None, query="FIX THE PRECISION")
+        result = await search_knowledge_base(None, query="Handle statistical drift and outliers")
         print(f"DEBUG VECTOR SEARCH RESULT: {result[:150]}...") # Printing snippet
         if "Retrieved Recipes" in result:
              print("Semantic Memory Tool (ChromaDB) working.")

@@ -3,6 +3,7 @@ import chromadb
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai import Agent, RunContext, UsageLimits
 import pandas as pd
+import numpy as np
 import os
 import json
 from dotenv import load_dotenv
@@ -25,13 +26,17 @@ model = GoogleModel('gemini-flash-latest')
 data_agent = Agent(
 	model=model,
 	system_prompt=(
-        "You are an Agentic Data Engineer. Goal: Clean data using Semantic RAG.\n"
+        "You are an Agentic ML Engineer. Goal: Clean data using Semantic RAG.\n"
         "### OPERATIONAL PROTOCOL (Strict 5 RPM Limit):\n"
-        "1. BATCH INSPECT: Use 'inspect_dataset' to identify ALL column issues at once.\n"
-        "2. SEMANTIC SEARCH: Use 'search_knowledge_base' to find similar solutions. "
-        "   The retrieved code is a HINT; adapt it to the actual column names in the CSV.\n"
-        "3. ONE-SHOT EXECUTION: Write one Python script to fix all identified issues in one call.\n"
-        "4. TERMINATION: Complete the task in 3 tool calls or less to stay under quota."
+	"1. INITIAL DISCOVERY: You MUST call 'inspect_dataset' AND 'check_data_drift' first. "
+    	"   Do not attempt to fix data until you know if the distribution has shifted.\n"
+    	"2. DRIFT ANALYSIS: If 'check_data_drift' reports a Z-score > 3, you MUST search "
+    	"   the knowledge base for 'Outlier' or 'Drift' recipes specifically.\n"
+        "3. BATCH INSPECT: Use 'inspect_dataset' to identify ALL column issues at once.\n"
+	"4. ONE-SHOT EXECUTION: Synthesize a single Python script that handles both the "
+	"   detected drift (e.g., capping outliers) and the precision/type cleaning.\n"
+	"5. QUOTA ADHERENCE: Aim to complete the entire cycle (Inspect -> Drift -> Search -> Apply) "
+	"   in 4 tool calls or less to stay under the 5 RPM limit."
     ),
 )
 
@@ -49,6 +54,28 @@ def inspect_dataset(ctx) -> str:
     except Exception as e:
         return f"File error: {e}"
 
+@data_agent.tool
+def check_data_drift(ctx) -> str:
+	"""Calculate statistical drift againts the baseline_stats.json"""
+	try:
+		df=pd.read_csv('data/retail_store_sales.csv')
+		with open('baseline_stats.json', 'r') as f:
+			baseline=json.load(f)
+		
+		drift_reports = []
+		for col, stats in baseline.items():
+			if col in df.columns:
+				current_mean=df[col].mean()
+				#Calculate the Z-Score of the current mean relative to baseline
+				z_score= abs(current_mean - stats['mean']) / (stats['std'] / np.sqrt(len(df)))
+				
+				#If Z-score > 3, it's statistically significant drift ( 99.7% drift )
+				status = "Drift Detected" if z_score > 3 else "Stable"
+				drift_reports.append(f"{col}: {status} (Z-score: {z_score:.2f})")
+
+		return "\n".join(drift_reports)
+	except Exception as e:
+		return f"Error during drift check: {str(e)}"
 
 """ DEACTIVATED OLD JSON SEARCH """
 

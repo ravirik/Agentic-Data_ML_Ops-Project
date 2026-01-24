@@ -17,6 +17,18 @@
 		"keyword" : "discount",
 		"solution" : "df[col] =df[col].map({'True': True, 'False' : False, 'nan' : None})",
 		"explanation" : "Converts string flags and nulls into native Boolean types."
+	},
+	{
+		"issue"  : "Statistical Data Drift / Outliers",
+		"keyword" : "drift, outlier, z-score, extreme values, sigma",
+		"solution" : "df[col] = df[col].clip(lower=df[col].quantile(0.05), upper=df[col].quantile(0.95))",
+		"explanation" : "Uses winsorization to cap extreme outliers at the 5th and 95th percentiles, preseerving dataset size while neutralizing statistical drift."
+	},
+	{
+		"issue" : "Baseline Deviation",
+		"keyword" : "recalibrate, baseline, distribution shift, mean shift",
+		"solution" : "mean = df[col].mean; std =df[col].std; df = df[((df[col] - mean) / std).abs() <=3]",
+		"explanation" : "Filters the dataset to retain only records within 3 standard deviations (99.7% confidence interval ) of the current mean to remove anomalous spikes."
 	}
-		]
+	]
 }
