@@ -1,59 +1,60 @@
-# Agentic-Data-MLOps — Retrieval-Augmented Generation (RAG) Agent
+# 🤖 Agentic-Data-MLOps — Retrieval-Augmented Generation (RAG) Agent
 
 ![Project Status](https://img.shields.io/badge/status-v1.3%20%E2%80%94%20RAG%20Prototype-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.12-brightgreen)
 ![Observability](https://img.shields.io/badge/observability-Logfire-lightgrey)
 
-Table of Contents
-- [Overview](#overview)
-- [What's new (v1.3)](#whats-new-v13)
-- [High-level flow & diagrams](#high-level-flow--diagrams)
-  - [Mermaid flowchart](#mermaid-flowchart)
-  - [ASCII architecture](#ascii-architecture)
-- [New Feature: Statistical Guardrails](#new-feature-statistical-guardrails)
-- [The 5-Layer Architecture](#the-5-layer-architecture)
-- [Primary components & runtime flow](#primary-components--runtime-flow)
-- [Repository layout & related repositories](#repository-layout--related-repositories)
-- [Quickstart — run locally (RAG + Guardrails)](#quickstart--run-locally-rag--guardrails)
-- [Security & safety (important)](#security--safety-important)
-- [Observability & quotas](#observability--quotas)
-- [Extending the project](#extending-the-project)
-- [Contributing](#contributing)
-- [License & contact](#license--contact)
+📚 Table of Contents
+- [🧭 Overview](#overview)
+- [🆕 What's new (v1.3)](#whats-new-v13)
+- [🗺️ High-level flow & diagrams](#high-level-flow--diagrams)
+  - [🧩 Mermaid flowchart](#mermaid-flowchart)
+  - [🖥️ ASCII architecture](#ascii-architecture)
+- [⚙️ New Feature: Statistical Guardrails](#new-feature-statistical-guardrails)
+- [🏗️ The 5-Layer Architecture](#the-5-layer-architecture)
+- [🔧 Primary components & runtime flow](#primary-components--runtime-flow)
+- [📁 Repository layout & related repositories](#repository-layout--related-repositories)
+- [🚀 Quickstart — run locally (RAG + Guardrails)](#quickstart--run-locally-rag--guardrails)
+- [🔒 Security & safety (important)](#security--safety-important)
+- [👀 Observability & quotas](#observability--quotas)
+- [✨ Extending the project](#extending-the-project)
+- [🤝 Contributing](#contributing)
+- [📄 License & contact](#license--contact)
 
-Overview
---------
-Agentic-Data-MLOps implements a Retrieval-Augmented Generation (RAG) agent designed for deterministic, auditable data transformations. The agent grounds its reasoning in a curated recipe knowledge base (O1), uses a type-safe orchestration layer (O2) and a verified execution sandbox (O3), while providing automated monitoring (O4) and full observability (O5).
+<a name="overview"></a>
+## 🧭 Overview
+Agentic-Data-MLOps implements a Retrieval-Augmented Generation (RAG) agent designed for deterministic, auditable data transformations. The agent grounds its reasoning in a curated recipe knowledge store and enforces a statistical gateway to prevent silent data failures.
 
-
-What's new ( RAG with Drift detection)
--------------------------------------
+<a name="whats-new-v13"></a>
+## 🆕 What's new (v1.3)
 - Formalized "Statistical Gateway" protocol and explicit guardrail behaviors.
 - Added a concise "Extending the project" note for adding recipes and CI/CD next steps.
 - Minor clarifications to quickstart and verification steps.
 
-High-level flow & diagrams
---------------------------
+<a name="high-level-flow--diagrams"></a>
+## 🗺️ High-level flow & diagrams
 
-Mermaid flowchart (rendered on GitHub)
+<a name="mermaid-flowchart"></a>
+### 🧩 Mermaid flowchart (rendered on GitHub)
 ```mermaid
 flowchart TD
   U[User / CLI] --> A[Agent Orchestrator (pydantic-ai + Gemini)]
-  A --> I[inspect_dataset() -> df.head(), schema summary]
-  A --> D[check_data_drift() -> compare to baseline_stats.json]
+  A --> I[inspect_dataset() --> df.head(), schema summary]
+  A --> D[check_data_drift() --> compare to baseline_stats.json]
   D -->|Z <= 3| R[semantic retrieval (ChromaDB)]
   D -->|Z > 3| W[retrieve Winsorization recipes]
   R --> T[adapt_recipe & verify (AST checks, small tests)]
   W --> T
   T --> VFY[verify & sign check]
-  VFY --> EX[apply_transformation() -> sandboxed exec]
+  VFY --> EX[apply_transformation() --> sandboxed exec]
   EX --> FS[Filesystem: data/*.csv]
   A --> L[Logfire traces (Pydantic Logfire)]
   L -->|audit| AuditStore[Audit Store / Journal.MD]
 ```
 
-ASCII architecture (compact)
+<a name="ascii-architecture"></a>
+### 🖥️ ASCII architecture (compact)
 ```
 User/CLI
    │
@@ -87,8 +88,8 @@ User/CLI
 Pydantic Logfire traces & Journal.MD (O5)
 ```
 
-New Feature: Statistical Guardrails
-----------------------------------
+<a name="new-feature-statistical-guardrails"></a>
+## ⚙️ New Feature: Statistical Guardrails
 The agent operates under a "Statistical Gateway" protocol to prevent silent data failures. Implementation details and behaviors are summarized below:
 
 - Drift Discovery:
@@ -105,8 +106,8 @@ The agent operates under a "Statistical Gateway" protocol to prevent silent data
   - Discovery tools (inspect_dataset) provide raw data samples (df.head()) and a compact schema summary so agent decisions are grounded in actual record values rather than purely metadata.
   - The system prompt enforces the "Mandatory Gateway" sequence: inspect_dataset() and check_data_drift() must be used before retrieval or transformations.
 
-The 5-Layer Architecture
-------------------------
+<a name="the-5-layer-architecture"></a>
+## 🏗️ The 5-Layer Architecture
 The project formalizes responsibilities into five layers demonstrated across the repository:
 
 - O1 — Memory:
@@ -124,8 +125,8 @@ The project formalizes responsibilities into five layers demonstrated across the
 - O5 — Observability:
   - Full-stack tracing and audits using Pydantic Logfire and human-readable run journals (Journal.MD).
 
-Primary components & runtime flow
---------------------------------
+<a name="primary-components--runtime-flow"></a>
+## 🔧 Primary components & runtime flow
 1. inspect_dataset(path) — sample rows (df.head()) and return a concise schema/sample summary.
 2. check_data_drift() — computes Z-scores for baseline comparison; emits drift report.
 3. retrieval — embed observation and query ChromaDB for top-k recipe vectors.
@@ -133,8 +134,8 @@ Primary components & runtime flow
 5. apply_transformation(python_code) — executes in a controlled environment and writes cleaned artifacts.
 6. observability — Logfire captures each reasoning turn and execution trace; Journal.MD persists human-readable outcomes.
 
-Repository layout & related repositories
----------------------------------------
+<a name="repository-layout--related-repositories"></a>
+## 📁 Repository layout & related repositories
 Core files discovered:
 - reasoning.py — agent wiring, tools: inspect_dataset, check_data_drift, apply_transformation, model init, Logfire integration.
 - data_baseline.py — baseline_stats.json generator.
@@ -151,8 +152,8 @@ Recommended repo split for scaling (optional):
 - ravirik/agentic-exec
 - ravirik/agentic-observability
 
-Quickstart — run locally (RAG + Guardrails)
-------------------------------------------
+<a name="quickstart--run-locally-rag--guardrails"></a>
+## 🚀 Quickstart — run locally (RAG + Guardrails)
 1. Clone:
    ```bash
    git clone https://github.com/ravirik/Agentic-Data_ML_Ops-Project.git
@@ -200,8 +201,8 @@ Quickstart — run locally (RAG + Guardrails)
    python agent_reasoning.py
    ```
 
-Security & safety (important)
------------------------------
+<a name="security--safety-important"></a>
+## 🔒 Security & safety (important)
 - Prototype uses exec() in apply_transformation() — unsafe for untrusted code.
 - Hardening recommendations:
   - AST whitelisting and node-level validation.
@@ -209,25 +210,25 @@ Security & safety (important)
   - Verify recipe signatures and require signed/approved recipes for execution.
   - Add golden-case unit tests per recipe and run them pre-execution.
 
-Observability & quotas
-----------------------
+<a name="observability--quotas"></a>
+## 👀 Observability & quotas
 - Pydantic Logfire integration captures agent reasoning and execution. Journal.MD and public Logfire traces provide reproducibility and audit trails.
 - UsageLimits: agent enforces a strict 5 RPM ceiling and is designed to complete the Inspect → Drift → Search → Apply cycle in minimal tool calls (goal: ≤4 calls).
 
-Extending the project
----------------------
+<a name="extending-the-project"></a>
+## ✨ Extending the project
 - New Recipes: Append new recipes to memory_store.json and re-run the indexing/migration script (e.g., scripts/index_recipes.py) to upsert vectors into ChromaDB.
 - CI/CD: Future work includes adding GitHub Actions for automated golden-case testing (validate recipes, run index validation, and run sanitized recipe tests without LLM calls).
 - Additional extensions: scaffold hardened execution runner, expand recipe metadata and signatures, or add human-in-the-loop approvals for high-severity drift actions.
 
-Contributing
-------------
+<a name="contributing"></a>
+## 🤝 Contributing
 1. Open an issue describing the change.
 2. Branch from `main`, implement, and create a PR.
 3. Include tests and documentation for any behavior changes.
 
-License & contact
------------------
+<a name="license--contact"></a>
+## 📄 License & contact
 Apache-2.0 — see `LICENSE`
 
 Maintainer: @ravirik
