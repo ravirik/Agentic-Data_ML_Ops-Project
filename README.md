@@ -39,18 +39,18 @@ Agentic-Data-MLOps implements a Retrieval-Augmented Generation (RAG) agent desig
 ### 🧩 Mermaid flowchart (rendered on GitHub)
 ```mermaid
 flowchart TD
-  U[User / CLI] --> A[Agent Orchestrator (pydantic-ai + Gemini)]
-  A --> I[inspect_dataset() --> df.head(), schema summary]
-  A --> D[check_data_drift() --> compare to baseline_stats.json]
-  D -->|Z <= 3| R[semantic retrieval (ChromaDB)]
-  D -->|Z > 3| W[retrieve Winsorization recipes]
-  R --> T[adapt_recipe & verify (AST checks, small tests)]
+  U[User / CLI] --> A["Agent Orchestrator (pydantic-ai + Gemini)"]
+  A --> I["inspect_dataset() --> df.head(), schema summary"]
+  A --> D["check_data_drift() --> compare to baseline_stats.json"]
+  D -->|Z <= 3| R["semantic retrieval (ChromaDB)"]
+  D -->|Z > 3| W["retrieve Winsorization recipes"]
+  R --> T["adapt_recipe & verify (AST checks, small tests)"]
   W --> T
   T --> VFY[verify & sign check]
-  VFY --> EX[apply_transformation() --> sandboxed exec]
-  EX --> FS[Filesystem: data/*.csv]
-  A --> L[Logfire traces (Pydantic Logfire)]
-  L -->|audit| AuditStore[Audit Store / Journal.MD]
+  VFY --> EX["apply_transformation() --> sandboxed exec"]
+  EX --> FS["Filesystem: data/*.csv"]
+  A --> L["Logfire traces (Pydantic Logfire)"]
+  L -->|audit| AuditStore["Audit Store / Journal.MD"]
 ```
 
 <a name="ascii-architecture"></a>
