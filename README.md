@@ -36,7 +36,7 @@ Agentic-Data-MLOps implements a Retrieval-Augmented Generation (RAG) agent desig
 ## 🗺️ High-level flow & diagrams
 
 <a name="mermaid-flowchart"></a>
-### 🧩 Mermaid flowchart (rendered on GitHub)
+### 🧩 Mermaid flowchart 
 ```mermaid
 flowchart TD
   U[User / CLI] --> A["Agent Orchestrator (pydantic-ai + Gemini)"]
@@ -54,7 +54,7 @@ flowchart TD
 ```
 
 <a name="ascii-architecture"></a>
-### 🖥️ ASCII architecture (compact)
+### 🖥️ ASCII architecture 
 ```
 User/CLI
    │
